@@ -5,7 +5,6 @@ namespace Paheko;
 require_once __DIR__ . '/_inc.php';
 
 $fields = array(
-	'etiquette'      =>  'Étiquette',
 	'couleur'        =>  'Couleur',
 	'modele'         =>  'Marque et modèle',
 	'source_details' =>  'Détails sur la source',

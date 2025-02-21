@@ -3,20 +3,14 @@
 {include file="./_nav.tpl" current="index"}
 
 <form method="get" action="fiche.php" class="fastFind">
-	<fieldset class="shortFormRight">
-		<legend>Trouver un vélo par numéro unique</legend>
+
+	<fieldset class="shortFormLeft">
+		<legend>Trouver un vélo</legend>
 		<p>
-			<input type="number" size="5" name="id" />
+			<input type="number" name="id" />
 			<input type="submit" value="Trouver" />
 		</p>
-	</fieldset>
-	<fieldset>
-		<legend>Trouver un vélo par numéro d'étiquette</legend>
-		<p>
-			<input type="number" size="5" name="etiquette" />
-			<input type="submit" value="Trouver" />
-			{linkbutton shape="search" href="recherche.php" label="Recherche avancée"}
-		</p>
+		{linkbutton shape="search" href="recherche.php" label="Recherche avancée"}
 	</fieldset>
 </form>
 
