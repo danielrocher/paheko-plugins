@@ -6,7 +6,6 @@
 		{if $session->canAccess($session::SECTION_CONFIG, $session::ACCESS_ADMIN)}
 			{linkbutton shape="settings" href="config.php" label="Configuration"}
 		{/if}
-		{linkbutton shape="table" href="ajout_demontage.php" label="Démontage"}
 		{linkbutton shape="plus" href="ajout.php" label="Enregistrer vélo"}
 	</aside>
 	<ul>
