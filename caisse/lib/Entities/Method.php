@@ -33,18 +33,16 @@ class Method extends Entity
 		self::TYPE_DEBT => 'Ardoise',
 	];
 
-	public function importForm(array $source = null)
+	public function importForm(?array $source = null)
 	{
-		if (null === $source) {
-			$source = $_POST;
-		}
+		$source ??= $_POST;
 
 		if (isset($source['min'])) {
-			$source['min'] = Utils::moneyToInteger($source['min']);
+			$source['min'] = trim($source['min']) === '' ? null : Utils::moneyToInteger($source['min']);
 		}
 
 		if (isset($source['max'])) {
-			$source['max'] = Utils::moneyToInteger($source['max']);
+			$source['max'] = trim($source['max']) === '' ? null : Utils::moneyToInteger($source['max']);
 		}
 
 		$source['enabled'] = !empty($source['enabled']);

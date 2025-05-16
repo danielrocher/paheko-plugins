@@ -83,7 +83,7 @@ class Tab extends Entity
 		$this->addItem($id);
 	}
 
-	public function addItem(int $id, string $user_weight = null, int $price = null, int $type = TabItem::TYPE_PRODUCT)
+	public function addItem(int $id, ?string $user_weight = null, ?int $price = null, int $type = TabItem::TYPE_PRODUCT)
 	{
 		if ($this->closed) {
 			throw new UserException('Cette note est close, impossible de modifier la note.');
@@ -199,6 +199,15 @@ class Tab extends Entity
 			ORDER BY ti.id;'), $this->id);
 	}
 
+	public function isUserIdMissing(): bool
+	{
+		if ($this->user_id) {
+			return false;
+		}
+
+		return DB::getInstance()->test(TabItem::TABLE, 'id_fee IS NOT NULL AND tab = ?', $this->id());
+	}
+
 	public function pay(int $method_id, int $amount, ?string $reference, bool $auto_close = true): void
 	{
 		if ($this->closed) {
@@ -211,8 +220,11 @@ class Tab extends Entity
 
 		$remainder = $this->getRemainder();
 
-		if ($amount > $remainder) {
+		if ($amount >= 0 && $amount > $remainder) {
 			throw new UserException('Il n\'est pas possible d\'encaisser un montant supérieur au reste à payer.');
+		}
+		elseif ($amount < 0 && $amount < $remainder) {
+			throw new UserException('Il n\'est pas possible de rembourser un montant supérieur au reste à rembourser.');
 		}
 
 		$options = $this->listPaymentOptions();
@@ -222,12 +234,20 @@ class Tab extends Entity
 			throw new UserException('Ce moyen de paiement n\'est pas disponible.');
 		}
 
-		if (empty($option->amount)) {
+		if ($option->type === Method::TYPE_DEBT && empty($this->name)) {
+			throw new UserException('Il n\'est pas possible d\'enregistrer une ardoise sans nom associé.');
+		}
+
+		if (null === $option->max_amount) {
 			throw new UserException('Ce moyen de paiement ne peut pas être utilisé pour cette note');
 		}
-		elseif ($amount > $option->amount) {
-			$a = $option->amount;
-			throw new UserException(sprintf('Ce moyen de paiement ne peut être utilisé pour un montant supérieur à %d,%02d€', (int) ($a/100), (int) ($a%100)));
+		elseif ($option->max_amount >= 0 && $amount > $option->max_amount) {
+			$a = $option->max_amount;
+			throw new UserException(sprintf('Ce moyen de paiement ne peut être utilisé pour un montant supérieur à %s€', Utils::money_format($a)));
+		}
+		elseif ($option->max_amount < 0 && $amount < $option->max_amount) {
+			$a = $option->max_amount;
+			throw new UserException(sprintf('Ce moyen de paiement ne peut être utilisé pour un montant inférieur à %s€', Utils::money_format($a)));
 		}
 
 		if (null !== $reference && $option->type !== Method::TYPE_TRACKED) {
@@ -279,10 +299,11 @@ class Tab extends Entity
 
 		return DB::getInstance()->getGrouped(POS::sql('SELECT id, *,
 			CASE
-				WHEN max IS NOT NULL AND max > 0 AND paid >= max THEN 0 -- We cannot use this payment method, we paid the max allowed amount with it
+				WHEN max IS NOT NULL AND max > 0 AND paid >= max THEN NULL -- We cannot use this payment method, we paid the max allowed amount with it
 				WHEN max IS NOT NULL AND max > 0 AND payable > max THEN max -- We have to pay more than max allowed, then just return max
-				WHEN min IS NOT NULL AND payable < min THEN 0 -- We cannot use as the minimum required amount has not been reached
-				ELSE MIN(:left, payable) END AS amount
+				WHEN min IS NOT NULL AND payable < min THEN NULL -- We cannot use as the minimum required amount has not been reached
+				WHEN :left < 0 THEN MAX(:left, payable)
+				ELSE MIN(:left, payable) END AS max_amount
 			FROM (SELECT m.*, SUM(pt.amount) AS paid, SUM(i.total) AS payable
 				FROM @PREFIX_methods m
 				INNER JOIN @PREFIX_products_methods pm ON pm.method = m.id
@@ -290,6 +311,7 @@ class Tab extends Entity
 				LEFT JOIN @PREFIX_tabs_payments AS pt ON pt.tab = i.tab AND m.id = pt.method
 				WHERE m.enabled = 1 ' . $where . '
 				GROUP BY m.id
+				ORDER BY name COLLATE NOCASE
 			);'), ['id' => $this->id, 'left' => $remainder]);
 	}
 
