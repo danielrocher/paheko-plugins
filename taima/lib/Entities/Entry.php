@@ -5,6 +5,7 @@ namespace Paheko\Plugin\Taima\Entities;
 use Paheko\Entity;
 use Paheko\Form;
 use Paheko\Users\Users;
+use Paheko\Utils;
 
 use KD2\DB\Date;
 
@@ -59,7 +60,14 @@ class Entry extends Entity
 
 	public function setDateString(string $date)
 	{
-		$this->setDate($this->filterUserDateValue($date, Date::class));
+		if (trim($date) === '') {
+			return;
+		}
+
+		$ts = Utils::parseDateTime($date, Date::class);
+
+		$this->assert($ts !== null, 'Invalid date string: ' . $date);
+		$this->setDate($ts);
 	}
 
 	public function setDuration(string $duration = null)

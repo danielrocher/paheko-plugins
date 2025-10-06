@@ -191,7 +191,12 @@
 						<dd>
 							<select name="method_id" id="f_method_id">
 								{foreach from=$payment_options item="method"}
-									<option value="{$method.id}" data-max="{$method.max_amount|money_raw}" data-type="{$method.type}">
+									<option value="{$method.id}"
+										data-max="{$method.max_amount|money_raw}"
+										data-type="{$method.type}"
+										{if $method.is_default}
+											selected="selected"
+										{/if}>
 										{$method.name}
 										{if $remainder > 0 && $remainder > $method.max_amount}
 											(jusqu'à {$method.amount|escape|money_currency:false})

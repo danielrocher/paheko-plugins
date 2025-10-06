@@ -21,7 +21,8 @@ class Method extends Entity
 	protected ?int $min = null;
 	protected ?int $max = null;
 	protected ?string $account = null;
-	protected bool $enabled = false;
+	protected bool $enabled = true;
+	protected bool $is_default = false;
 
 	const TYPE_TRACKED = 0;
 	const TYPE_CASH = 1;
@@ -51,6 +52,10 @@ class Method extends Entity
 			$source['account'] = Form::getSelectorValue($source['account']);
 		}
 
+		if (isset($source['is_default_present'])) {
+			$source['is_default'] = !empty($source['is_default']);
+		}
+
 		parent::importForm($source);
 	}
 
@@ -58,6 +63,19 @@ class Method extends Entity
 	public function selfCheck(): void
 	{
 		$this->assert(!empty($this->name) && trim($this->name) !== '', 'Le nom ne peut rester vide.');
+	}
+
+	public function save(bool $selfcheck = true): bool
+	{
+		$default_modified = $this->isModified('is_default');
+		$r = parent::save($selfcheck);
+
+		if ($r && $default_modified) {
+			$db = EntityManager::getInstance(static::class)->DB();
+			$db->update(self::TABLE, ['is_default' => 0], 'id != ' . $this->id());
+		}
+
+		return $r;
 	}
 
 	public function delete(): bool

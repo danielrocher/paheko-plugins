@@ -6,7 +6,9 @@ use Paheko\Plugin\PIM\ChangesTracker;
 
 use Paheko\DB;
 use Paheko\Entity;
+use Paheko\UserException;
 use Paheko\Utils;
+
 use KD2\DB\Date;
 use KD2\Graphics\Image;
 use DateTime;
@@ -248,10 +250,6 @@ class Contact extends Entity
 		// No name: no contact
 		if (!$name) {
 			return;
-		}
-
-		//	var_dump($name->getValue()); exit;
-		if (strpos($obj->N->getValue(), 'rustine') !== false) {
 		}
 
 		$name = explode(';', $name->getValue());

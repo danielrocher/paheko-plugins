@@ -65,6 +65,22 @@ class POS
 			$group = 'strftime(\'%Y-%m-01\', ' . $column_name . ')';
 			$label = 'Mois';
 		}
+		elseif ($period === 'day') {
+			$group = 'strftime(\'%d/%m/%Y\', ' . $column_name . ')';
+			$label = 'Jour';
+		}
+		elseif ($period === 'weekday') {
+			$group = 'CASE strftime(\'%w\', ' . $column_name . ')
+					WHEN \'0\' THEN \'7-dimanche\'
+					WHEN \'1\' THEN \'1-lundi\'
+					WHEN \'2\' THEN \'2-mardi\'
+					WHEN \'3\' THEN \'3-mercredi\'
+					WHEN \'4\' THEN \'4-jeudi\'
+					WHEN \'5\' THEN \'5-vendredi\'
+					WHEN \'6\' THEN \'6-samedi\'
+					END';
+			$label = 'Jour de la semaine';
+		}
 		elseif ($period === 'year') {
 			$group = null;
 			$label = 'Année';
@@ -76,12 +92,18 @@ class POS
 		}
 
 		if ($group) {
-			$list->groupBy($group . ', ' . $list->getGroupBy());
+			$old = $list->getGroupBy();
+
+			if ($old) {
+				$group .= ', ' . $old;
+			}
+
+			$list->groupBy($group);
 
 			$list->addColumn('period', [
 				'select' => $group,
 				'label' => $label,
-				'order' => $column_name . ' %s',
+				//'order' => $column_name . ' %s',
 			], 0);
 
 			$list->orderBy('period', false);

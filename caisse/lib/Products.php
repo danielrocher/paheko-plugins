@@ -6,6 +6,8 @@ use Paheko\DB;
 use Paheko\DynamicList;
 use KD2\DB\EntityManager as EM;
 
+use Paheko\Plugin\Caisse\Entities\Product;
+
 class Products
 {
 	static public function listBuyableByCategory(): array
@@ -53,6 +55,104 @@ class Products
 			INNER JOIN @PREFIX_categories c ON c.id = p.category
 			WHERE 1 %s
 			GROUP BY p.id ORDER BY category_name COLLATE U_NOCASE, name COLLATE U_NOCASE;', $join, $where)));
+	}
+
+	/**
+	 * Return list of products for stock view
+	 */
+	static public function getStockList(bool $archived = false, ?string $search = null): DynamicList
+	{
+		$list = self::getList($archived, $search);
+		$list->addConditions(' AND p.stock IS NOT NULL');
+		$list->addColumn('sale_value', ['select' => 'p.stock * p.price', 'label' => 'Valeur à la vente']);
+		$list->addColumn('stock_value', ['select' => 'p.stock * p.purchase_price', 'label' => 'Valeur du stock (à l\'achat)']);
+		return $list;
+	}
+
+	/**
+	 * Return list of products for management
+	 */
+	static public function getList(bool $archived = false, ?string $search = null): DynamicList
+	{
+		$columns = [
+			'category' => [
+				'select' => 'c.name',
+				'label' => 'Catégorie',
+				'order' => 'c.name COLLATE U_NOCASE %s, name COLLATE U_NOCASE %1$s',
+			],
+			'name' => [
+				'select' => 'p.name',
+				'label' => 'Nom',
+			],
+			'price' => [
+				'select' => 'p.price',
+				'label' => 'Prix unitaire',
+			],
+			'qty' => [
+				'select' => 'p.qty',
+				'label' => 'Quantité par défaut',
+			],
+			'id' => ['select' => 'p.id'],
+			'id_category' => ['select' => 'p.category'],
+			'stock' => ['select' => 'p.stock'],
+			'num' => [
+				'select' => 'p.id',
+				'label' => 'Numéro unique',
+				'export' => true,
+			],
+			'code' => [
+				'select' => 'p.code',
+				'label' => 'Code barre',
+				'export' => true,
+			],
+			'description' => [
+				'select' => 'p.description',
+				'label' => 'Description',
+				'export' => true,
+			],
+			'purchase_price' => [
+				'select' => 'p.purchase_price',
+				'label' => 'Prix d\'achat unitaire',
+				'export' => true,
+			],
+			'stock2' => [
+				'select' => 'p.stock',
+				'label' => 'Stock',
+				'export' => true,
+			],
+			'archived' => [
+				'select' => 'CASE WHEN p.archived = 1 THEN \'Archivé\' END',
+				'label' => 'Archivé',
+				'export' => true,
+			],
+			'weight' => [
+				'select' => sprintf('CASE p.weight WHEN NOT NULL THEN p.weight WHEN %d THEN \'Poids demandé\' WHEN %d THEN \'Prix au poids\' END', Product::WEIGHT_REQUIRED, Product::WEIGHT_BASED_PRICE),
+				'label' => 'Poids',
+				'export' => true,
+			],
+		];
+
+		$conditions = 'p.archived = ' . (int) $archived;
+
+		$search = is_string($search) ? trim($search) : null;
+		$search = $search ?: null;
+
+		if ($search !== null) {
+			$conditions .= ' AND p.name LIKE :search ESCAPE \'\\\'';
+		}
+
+		$list = POS::DynamicList($columns, '@PREFIX_products p INNER JOIN @PREFIX_categories c ON c.id = p.category', $conditions);
+		$list->orderBy('category', false);
+		$list->setTitle('Liste des produits');
+
+		if ($search !== null) {
+			$db = DB::getInstance();
+			$search = trim($search);
+			$search = '%' . $db->escapeLike($search, '\\') . '%';
+			$list->setParameter('search', $search);
+		}
+
+		return $list;
 	}
 
 	static public function get(int $id): ?Entities\Product

@@ -150,7 +150,6 @@ class Tabs
 				'label' => 'Nom',
 			],
 			'user_id' => [],
-			'method' => [],
 			'account' => [],
 			'amount' => [
 				'label' => 'Montant',
@@ -222,4 +221,76 @@ class Tabs
 
 		return $list;
 	}
+
+
+	static public function listStats(int $year, string $period = 'year'): DynamicList
+	{
+		$columns = [
+			'count' => [
+				'label' => 'Nombre de notes',
+				'select' => 'COUNT(*)',
+			],
+			'products_count' => [
+				'label' => 'Nombre de produits',
+				'select' => 'SUM(ti.qty)',
+			],
+			'price' => [
+				'label' => 'Montant moyen d\'un produit',
+				'select' => 'AVG(ti.price)',
+			],
+			'sum' => [
+				'label' => 'Montant moyen de la note',
+				'select' => 'SUM(ti.total)/COUNT(*)',
+			],
+			'avg_open_time' => [
+				'label' => 'Heure d\'ouverture moyenne',
+				'select' => 'AVG(strftime(\'%H.%M\', t.opened))',
+			],
+			'avg_close_time' => [
+				'label' => 'Heure de fermeture moyenne',
+				'select' => 'AVG(strftime(\'%H\', t.closed)+(strftime(\'%M\', t.closed)/60))',
+			],
+		];
+
+		$list = POS::DynamicList($columns, '@PREFIX_tabs t INNER JOIN @PREFIX_tabs_items ti ON ti.tab = t.id', 'strftime(\'%Y\', t.opened) = :year AND t.closed IS NOT NULL AND ti.total > 0');
+		$list->orderBy('count', true);
+		//$list->groupBy('t.session');
+		$list->setParameter('year', (string)$year);
+		$list->setTitle(sprintf('Notes %d', $year));
+
+		if ($period === 'all' || $period === 'day') {
+			$columns['weekday'] = [
+				'label' => 'Jour de la semaine',
+				'select' => 'CASE strftime(\'%w\', t.opened)
+					WHEN \'0\' THEN \'7-dimanche\'
+					WHEN \'1\' THEN \'1-lundi\'
+					WHEN \'2\' THEN \'2-mardi\'
+					WHEN \'3\' THEN \'3-mercredi\'
+					WHEN \'4\' THEN \'4-jeudi\'
+					WHEN \'5\' THEN \'5-vendredi\'
+					WHEN \'6\' THEN \'6-samedi\'
+					END',
+			];
+		}
+
+		$list->setColumns($columns);
+
+		// List all sales
+		if ($period === 'all') {
+			$columns['date_short'] = [
+				'select' => 'strftime(\'%d/%m/%Y\', t.opened)',
+				'label'  => 'Date',
+			];
+			$columns['session'] = [
+				'select' => 't.session',
+				'label'  => 'Session',
+			];
+			$list->setColumns($columns);
+			$list->orderBy('date_short', true);
+		}
+		POS::applyPeriodToList($list, $period, 't.opened', 't.session');
+
+		return $list;
+	}
+
 }
