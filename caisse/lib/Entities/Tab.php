@@ -89,14 +89,23 @@ class Tab extends Entity
 			throw new UserException('Cette note est close, impossible de modifier la note.');
 		}
 
-		$db = DB::getInstance();
-		$product = $db->first(POS::sql('SELECT p.*, c.name AS category_name, c.account AS category_account
-			FROM @PREFIX_products p
-			INNER JOIN @PREFIX_categories c ON c.id = p.category
-			WHERE p.id = ?'), $id);
+		$product = Products::get($id);
 
 		if (!$product) {
 			throw new UserException('This product does not exist: ' . $id);
+		}
+
+		$parent = $this->addProductItem($product, $user_weight, $price, $type);
+
+		foreach ($product->listLinkedProducts() as $p) {
+			$this->addProductItem($p, null, null, TabItem::TYPE_PRODUCT, $parent->id());
+		}
+	}
+
+	public function addProductItem(Product $product, ?string $user_weight = null, ?int $price = null, int $type = TabItem::TYPE_PRODUCT, ?int $id_parent = null): TabItem
+	{
+		if ($this->closed) {
+			throw new UserException('Cette note est close, impossible de modifier la note.');
 		}
 
 		$weight = $product->weight;
@@ -113,20 +122,23 @@ class Tab extends Entity
 
 		$item = new TabItem;
 		$item->importForm([
-			'tab'           => $this->id,
-			'product'       => (int)$product->id,
-			'qty'           => (int)$product->qty,
-			'price'         => $price,
-			'weight'        => $weight,
-			'name'          => $product->name,
-			'category_name' => $product->category_name,
-			'description'   => $product->description,
-			'account'       => $product->category_account,
-			'type'          => $type,
-			'pricing'       => $pricing,
-			'id_fee'        => $product->id_fee,
+			'tab'            => $this->id,
+			'product'        => (int)$product->id,
+			'qty'            => (int)$product->qty,
+			'price'          => $price,
+			'weight'         => $weight,
+			'name'           => $product->name,
+			'category_name'  => $product->category()->name,
+			'description'    => $product->description,
+			'account'        => $product->category()->account,
+			'type'           => $type,
+			'pricing'        => $pricing,
+			'id_fee'         => $product->id_fee,
+			'id_parent_item' => $id_parent,
 		]);
+
 		$item->save();
+		return $item;
 	}
 
 	public function getItem(int $id): ?TabItem
@@ -146,6 +158,10 @@ class Tab extends Entity
 			return;
 		}
 
+		if ($item->id_parent_item) {
+			throw new UserException('Ce produit est lié à un autre produit, il ne peut être supprimé seul, il faut supprimer le produit "parent".');
+		}
+
 		$item->delete();
 	}
 
@@ -156,6 +172,12 @@ class Tab extends Entity
 		}
 
 		$item = $this->getItem($id);
+
+		// Item has vanished
+		if (!$item) {
+			return;
+		}
+
 		$item->set('qty', $qty);
 		$item->save();
 	}
@@ -169,6 +191,12 @@ class Tab extends Entity
 		$weight = Utils::weightToInteger($weight);
 
 		$item = $this->getItem($id);
+
+		// Item has vanished
+		if (!$item) {
+			return;
+		}
+
 		$item->set('weight', $weight);
 		$item->save();
 	}
@@ -182,6 +210,12 @@ class Tab extends Entity
 		$price = Utils::moneyToInteger($price);
 
 		$item = $this->getItem($id);
+
+		// Item has vanished
+		if (!$item) {
+			return;
+		}
+
 		$item->set('price', $price);
 		$item->save();
 	}
@@ -316,18 +350,28 @@ class Tab extends Entity
 	}
 
 	public function rename(string $new_name, ?int $user_id) {
+		if ($this->closed && ($this->user_id || $this->name)) {
+			throw new UserException('Cette note est close, impossible de modifier la note.');
+		}
+
 		$new_name = trim($new_name);
 		$db = DB::getInstance();
 		return $db->update(POS::tbl('tabs'), ['name' => $new_name, 'user_id' => $user_id], $db->where('id', $this->id));
 	}
 
-	public function renameItem(int $id, string $name)
+	public function renameItem(int $id, string $name): void
 	{
 		if ($this->closed) {
 			throw new UserException('Cette note est close, impossible de modifier la note.');
 		}
 
 		$item = $this->getItem($id);
+
+		// Item has vanished
+		if (!$item) {
+			return;
+		}
+
 		$item->set('name', trim($name));
 		$item->save();
 	}

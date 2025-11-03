@@ -79,8 +79,9 @@
 				{elseif !$current_tab.closed}
 					{button type="submit" name="close" label="Clore la note" accesskey="C" shape="lock" disabled="disabled" title="La note ne peut être close, elle n'est pas soldée."}
 				{/if}
+				{if !$current_tab.closed || (!$current_tab.name && !$current_tab.user_id)}
 					{button type="button" label="Renommer" accesskey="R" shape="edit" id="tab_user_rename"}
-				</form>
+				{/if}
 			</div>
 
 			{if $debt}
@@ -127,7 +128,7 @@
 					{/if}
 					<td class="money">{$item.total|escape|money_currency:false}</td>
 					<td class="actions">
-						{if !$current_tab.closed}
+						{if !$current_tab.closed && !$item.id_parent_item}
 							{button type="submit" label="" shape="delete" name="delete_item" value=$item.id title="Cliquer pour supprimer la ligne"}
 						{/if}
 					</td>
@@ -226,6 +227,7 @@
 		{/if}
 		</section>
 	</section>
+	</form>
 
 	{if !$current_tab.closed}
 	<section class="products">

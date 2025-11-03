@@ -39,6 +39,11 @@ $form->runIf(qg('code') !== null, function () use ($current_pos_session, &$tab) 
 	Utils::redirect(Utils::plugin_url(['file' => 'tab.php', 'query' => 'id=' . $tab->id]));
 });
 
+if ($tab) {
+	$url = Utils::plugin_url(['file' => 'tab.php', 'query' => 'id=' . $tab->id]);
+	$csrf_key = null;
+}
+
 if (!empty($_GET['payoff_amount']) && !empty($_GET['payoff_account'])) {
 	if (!$current_pos_session) {
 		throw new UserException('Aucune session de caisse n\'est ouverte.');
@@ -61,10 +66,13 @@ elseif (null !== qg('new')) {
 	Utils::redirect(Utils::plugin_url(['file' => 'tab.php', 'query' => 'id=' . $tab->id()]));
 }
 elseif ($tab) {
-	$url = Utils::plugin_url(['file' => 'tab.php', 'query' => 'id=' . $tab->id]);
-	$csrf_key = null;
+	$form->runIf('rename_name', function () use ($tab) {
+		$tab->rename($_POST['rename_name'], intval($_POST['rename_id'] ?? 0) ?: null);
+	}, $csrf_key, $url);
+}
 
-	$form->runIf('add_item', function () use ($tab) {
+if ($tab && !$current_pos_session->closed) {
+	$form->runIf(!empty($_POST['add_item']) && is_array($_POST['add_item']), function () use ($tab) {
 		$tab->addItem((int)key($_POST['add_item']), current($_POST['add_item']));
 	}, $csrf_key, $url);
 
@@ -99,10 +107,6 @@ elseif ($tab) {
 
 	$form->runIf('delete_payment', function () use ($tab) {
 		$tab->removePayment((int) $_POST['delete_payment']);
-	}, $csrf_key, $url);
-
-	$form->runIf('rename_name', function () use ($tab) {
-		$tab->rename($_POST['rename_name'], intval($_POST['rename_id'] ?? 0) ?: null);
 	}, $csrf_key, $url);
 
 	$form->runIf('rename_item', function () use ($tab) {

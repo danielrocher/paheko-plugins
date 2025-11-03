@@ -155,6 +155,14 @@ class Products
 		return $list;
 	}
 
+	static public function getListForLinking(int $id, bool $archived = false, ?string $search = null): DynamicList
+	{
+		$list = self::getList($archived, $search);
+		$list->addConditions(sprintf(POS::sql(' AND p.id NOT IN (SELECT id_product FROM @PREFIX_products_links) AND p.id != %d'), $id));
+		$list->removeColumns(['archived', 'stock2', 'weight', 'purchase_price', 'code', 'description', 'num', 'stock', 'price', 'qty']);
+		return $list;
+	}
+
 	static public function get(int $id): ?Entities\Product
 	{
 		return EM::findOneById(Entities\Product::class, $id);
@@ -196,7 +204,7 @@ class Products
 		return $product;
 	}
 
-	static public function listSales(int $year, string $period = 'year'): DynamicList
+	static public function listSales(int $year, string $period = 'year', ?int $location = null): DynamicList
 	{
 		$columns = [
 			'name' => [
@@ -223,6 +231,11 @@ class Products
 		$list->setTitle(sprintf('Ventes %d, par produit', $year));
 		$list->groupBy('i.product');
 		POS::applyPeriodToList($list, $period, 'i.added', 'i.id');
+
+		if ($location) {
+			$list->addTables(POS::sql('INNER JOIN @PREFIX_tabs t ON t.id = i.tab INNER JOIN @PREFIX_sessions s ON s.id = t.session'));
+			$list->addConditions(sprintf('AND s.id_location = %d', $location));
+		}
 
 		// List all sales
 		if ($period === 'all') {
