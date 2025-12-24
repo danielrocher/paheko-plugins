@@ -173,37 +173,6 @@ class Products
 		return new Entities\Product;
 	}
 
-	static public function createAndSaveForDebtAccount(string $account): Entities\Product
-	{
-		$db = DB::getInstance();
-		$db->begin();
-		$category_id = $db->firstColumn(POS::sql('SELECT id FROM @PREFIX_categories WHERE account = ?;'), $account);
-
-		if (!$category_id) {
-			$cat = Categories::new();
-			$cat->importForm([
-				'account' => $account,
-				'name'    => 'Règlement d\'ardoise',
-			]);
-
-			$cat->save();
-			$category_id = $cat->id();
-		}
-
-		$product = self::new();
-		$product->importForm([
-			'category' => $category_id,
-			'name'     => 'Règlement d\'ardoise',
-			'qty'      => 1,
-			'archived' => true,
-		]);
-
-		$product->save();
-		$product->enableAllMethodsExceptDebt();
-		$db->commit();
-		return $product;
-	}
-
 	static public function listSales(int $year, string $period = 'year', ?int $location = null): DynamicList
 	{
 		$columns = [
@@ -268,5 +237,19 @@ class Products
 	static public function checkUserWeightIsRequired(): bool
 	{
 		return DB::getInstance()->test(POS::tbl('products'), 'weight < 0');
+	}
+
+	static public function markSelectedAsArchived(array $ids, bool $archived)
+	{
+		$ids = array_map('intval', $ids);
+		$db = DB::getInstance();
+		$db->exec(sprintf(POS::sql('UPDATE @PREFIX_products SET archived = %d WHERE %s;'), $archived, $db->where('id', $ids)));
+	}
+
+	static public function deleteSelected(array $ids)
+	{
+		$ids = array_map('intval', $ids);
+		$db = DB::getInstance();
+		$db->exec(sprintf(POS::sql('DELETE FROM @PREFIX_products WHERE %s;'), $db->where('id', $ids)));
 	}
 }

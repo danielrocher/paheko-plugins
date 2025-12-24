@@ -105,8 +105,13 @@ class Product extends Entity
 			return '';
 		}
 
-		$code = new BarCode($this->code);
-		return $code->toSVG();
+		try {
+			$code = new BarCode($this->code);
+			return $code->toSVG();
+		}
+		catch (\LogicException $e) {
+			return '';
+		}
 	}
 
 	public function setMethods(array $methods): void
@@ -122,12 +127,6 @@ class Product extends Entity
 		}
 
 		$db->commit();
-	}
-
-	public function enableAllMethodsExceptDebt(): void
-	{
-		$sql = POS::sql('INSERT INTO @PREFIX_products_methods (product, method) SELECT ?, id FROM @PREFIX_methods WHERE type != ?;');
-		DB::getInstance()->preparedQuery($sql, $this->id(), Method::TYPE_DEBT);
 	}
 
 	public function getHistoryList(bool $only_events = false): DynamicList

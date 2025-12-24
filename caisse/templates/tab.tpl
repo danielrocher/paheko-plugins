@@ -1,13 +1,16 @@
 {include file="_head.tpl"}
 
 <nav class="tabs">
-	{if $debt_total || $session->canAccess($session::SECTION_ACCOUNTING, $session::ACCESS_ADMIN)}
+	{if $debt_balance || $has_credit_methods || $session->canAccess($session::SECTION_ACCOUNTING, $session::ACCESS_ADMIN)}
 	<aside>
-		{if $debt_total}
-			{assign var="debt_total" value=$debt_total|money_currency_text}
-			{linkbutton href="debts.php" label="Ardoises : %s"|args:$debt_total shape="history"}
+		{if $debt_balance}
+			{assign var="debt_total" value=$debt_balance|abs|money_currency_text}
+			{linkbutton href="balances.php?type=2" label="Ardoises : %s"|args:$debt_total shape="history"}
 		{else}
-			{linkbutton href="debts.php" label="Ardoises" shape="history"}
+			{linkbutton href="balances.php?type=2" label="Ardoises" shape="history"}
+		{/if}
+		{if $has_credit_methods}
+			{linkbutton href="balances.php?type=3" label="Porte-monnaie" shape="list-ul"}
 		{/if}
 		{if $session->canAccess($session::SECTION_ACCOUNTING, $session::ACCESS_ADMIN)}
 			{linkbutton href="manage/" label="Gestion et statistiques" shape="settings"}
@@ -69,6 +72,10 @@
 					{linkbutton title="Reçu" label=null shape="print" target="_dialog" href="./receipt.php?tab=%d"|args:$current_tab.id}
 				{if $current_tab.user_id}
 					{linkbutton href="!users/details.php?id=%d"|args:$current_tab.user_id label="" shape="user" target="_blank" title="Ouvrir la fiche membre"}
+					{if $has_credit_methods}
+						{assign var="label" value=$user_credit|money_text:false}
+						{linkbutton href="balances_history.php?type=3&id_user=%d&id_tab=%d"|args:$current_tab.user_id:$current_tab.id label=$label title="Porte-monnaie" target="_dialog" shape="money"}
+					{/if}
 				{/if}
 				{if !$remainder && !$current_tab.closed}
 					{button type="submit" name="close" label="Clore la note" accesskey="C" shape="lock"}
@@ -84,14 +91,12 @@
 				{/if}
 			</div>
 
-			{if $debt}
-			<p class="alert block">
-				Ce membre doit {$debt|money_currency_html|raw}
-				{linkbutton href="debts_history.php?user=%d"|args:$current_tab.user_id label="Historique des ardoises" shape="menu"}
-				{if !$current_tab.closed}
+			{if $debt < 0}
+				<p class="alert block">
+					Ce membre doit {$debt|abs|money_currency_html|raw}
+					{linkbutton href="balances_history.php?type=2&user=%d"|args:$current_tab.user_id label="Historique" shape="menu"}
 					{button type="submit" name="add_debt" value="1" label="Payer cette ardoise" shape="money"}
-				{/if}
-			</p>
+				</p>
 			{/if}
 		</header>
 
@@ -113,8 +118,20 @@
 					<th><small class="cat">{$item.category_name}</small> {$item.name}
 						{if !$current_tab.closed}<button title="Cliquer pour renommer" type="submit" value="{$item.name}" name="rename_item[{$item.id}]">{icon shape="edit"}</button>{/if}
 					</th>
-					<td>{if !$current_tab.closed}<input type="submit" name="change_qty[{$item.id}]" value="{$item.qty}" title="Cliquer pour changer la quantité" />{else}{$item.qty}{/if}</td>
-					<td class="money">{if !$current_tab.closed}<button type="submit" title="Cliquer pour changer le prix unitaire" name="change_price[{$item.id}]">{$item.price|escape|money_currency:false}</button>{else}{$item.price|raw|money_currency:false}{/if}</td>
+					<td class="qty">
+						{if !$current_tab.closed && $item->canChangeQty()}
+							<input type="submit" name="change_qty[{$item.id}]" value="{$item.qty}" title="Cliquer pour changer la quantité" />
+						{else}
+							{$item.qty}
+						{/if}
+					</td>
+					<td class="money">
+						{if !$current_tab.closed}
+							<button type="submit" title="Cliquer pour changer le prix unitaire" name="change_price[{$item.id}]">{$item.price|escape|money_currency:false}</button>
+						{else}
+							{$item.price|raw|money_currency:false}
+						{/if}
+					</td>
 					{if $has_weight}
 						<td class="money">
 							{if !$current_tab.closed && $item.weight}
@@ -193,14 +210,21 @@
 							<select name="method_id" id="f_method_id">
 								{foreach from=$payment_options item="method"}
 									<option value="{$method.id}"
-										data-max="{$method.max_amount|money_raw}"
+										data-max="{$method.payable|money_raw}"
 										data-type="{$method.type}"
-										{if $method.is_default}
+										{if !$method.payable}
+											disabled="disabled"
+										{elseif $method.is_default}
 											selected="selected"
 										{/if}>
+										{if !$method.payable}
+											&cross;
+										{/if}
 										{$method.name}
-										{if $remainder > 0 && $remainder > $method.max_amount}
-											(jusqu'à {$method.amount|escape|money_currency:false})
+										{if !$method.payable}
+											({$method.explain})
+										{elseif $remainder > 0 && $remainder > $method.payable}
+											(jusqu'à {$method.payable|escape|money_currency:false})
 										{/if}
 									</option>
 								{/foreach}

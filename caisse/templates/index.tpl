@@ -3,16 +3,19 @@
 <nav class="tabs">
 	<aside>
 		{exportmenu}
-		{linkbutton href="debts.php" label="Ardoises" shape="history"}
-	{if $session->canAccess($session::SECTION_ACCOUNTING, $session::ACCESS_ADMIN)}
-		{linkbutton href="manage/" label="Gestion et statistiques" shape="settings"}
-	{/if}
+		{linkbutton href="balances.php?type=2" label="Ardoises" shape="history"}
+		{if $has_credit_methods}
+			{linkbutton href="balances.php?type=3" label="Porte-monnaie" shape="list-ul"}
+		{/if}
+		{if $session->canAccess($session::SECTION_ACCOUNTING, $session::ACCESS_ADMIN)}
+			{linkbutton href="manage/" label="Gestion et statistiques" shape="settings"}
+		{/if}
 	</aside>
 
 	{if $current_pos_session}
 		{linkbutton href="tab.php?session=%d"|args:$current_pos_session shape="right" label="Reprendre la session" class="main"}
 	{/if}
-	{linkbutton href="session_open.php" shape="plus" label="Ouvrir une session de caisse" class="main"}
+	{linkbutton href="session_open.php" shape="plus" label="Ouvrir une session de caisse" class="main" target="_dialog"}
 </nav>
 
 {include file="common/dynamic_list_head.tpl"}
@@ -45,14 +48,18 @@
 					{/if}
 				{/if}
 			</td>
-			<td class="money">{$pos_session.open_amount|raw|money_currency}</td>
-			<td class="money">{$pos_session.close_amount|raw|money_currency}</td>
+			{if $list->hasColumn('open_amount')}
+				<td class="money">{$pos_session.open_amount|raw|money_currency}</td>
+				<td class="money">{$pos_session.close_amount|raw|money_currency}</td>
+			{/if}
 			<td class="money">{$pos_session.total|raw|money_currency}</td>
+			{if $list->hasColumn('error_amount')}
 			<td class="money">
 				{if $pos_session.error_amount}
 					<span class="error">{$pos_session.error_amount|raw|money_currency}</span>
 				{/if}
 			</td>
+			{/if}
 			<td class="num">{$pos_session.tabs_count}</td>
 			<td class="actions">
 				{if !$pos_session.closed}
