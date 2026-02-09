@@ -209,7 +209,12 @@ class Tab extends Entity
 			throw new UserException('Cette note est close, impossible de modifier la note.');
 		}
 
-		$price = Utils::moneyToInteger($price);
+		try {
+			$price = Utils::moneyToInteger($price, true);
+		}
+		catch (\InvalidArgumentException $e) {
+			throw new UserException($e->getMessage(), 0, $e);
+		}
 
 		$item = $this->getItem($id);
 
@@ -472,11 +477,22 @@ class Tab extends Entity
 			throw new UserException(sprintf("Impossible de clôturer la note: reste %s € à régler.", $remainder / 100));
 		}
 
+		if (!$force_tab_name && $this->requiresName()) {
+			$force_tab_name = true;
+		}
+
 		if ($force_tab_name && empty($this->name) && empty($this->user_id)) {
 			throw new UserException('Impossible de clôturer la note : aucun nom n\'a été fourni.');
 		}
 
 		return DB::getInstance()->preparedQuery(POS::sql('UPDATE @PREFIX_tabs SET closed = datetime(\'now\',\'localtime\') WHERE id = ?;'), [$this->id]);
+	}
+
+	public function requiresName(): bool
+	{
+		$db = DB::getInstance();
+		return $db->test(TabItem::TABLE, 'tab = ? AND (type = ? OR type = ?)', $this->id(), TabItem::TYPE_PAYOFF, TabItem::TYPE_CREDIT)
+			|| $db->test(POS::tbl('tabs_payments'), 'tab = ? AND (type = ? OR type = ?)', $this->id(), Method::TYPE_DEBT, Method::TYPE_CREDIT);
 	}
 
 	public function reopen() {
@@ -518,6 +534,15 @@ class Tab extends Entity
 			throw new UserException('Cette note est close, impossible de modifier la note.');
 		}
 
+		if (!$this->user_id) {
+			return;
+		}
+
+		if ($this->getUserDebt() >= 0) {
+			// Don't add debt if user has no debt
+			return;
+		}
+
 		$sql = 'SELECT SUM(amount) AS amount, id_method, method, account FROM (%s)
 			WHERE user_id = ? AND type IN (\'debt\', \'payoff\')
 			GROUP BY id_method
@@ -533,6 +558,10 @@ class Tab extends Entity
 
 	public function addPayoff(int $amount, int $id_method, ?string $method_account = null, ?string $method_name = null): TabItem
 	{
+		if ($this->user_id && $this->getUserDebt() >= 0) {
+			throw new UserException('Ce membre n\'a pas d\'ardoise à payer');
+		}
+
 		if (!isset($method_account, $method_name)) {
 			$method = Methods::get($id_method);
 			$method_account = $method->account;
