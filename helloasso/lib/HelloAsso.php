@@ -5,6 +5,7 @@ namespace Paheko\Plugin\HelloAsso;
 use Paheko\Config;
 use Paheko\DB;
 use Paheko\Plugins;
+use Paheko\Utils;
 use Paheko\Entities\Plugin;
 use Paheko\Users\DynamicFields;
 
@@ -162,10 +163,10 @@ class HelloAsso
 					$value = (string) key($value);
 				}
 			}
-			elseif ($type === 'bool') {
+			elseif ($type === 'boolean') {
 				$value = (bool) $value;
 			}
-			elseif ($type === 'int') {
+			elseif ($type === 'integer') {
 				$value = (int) $value;
 			}
 
@@ -186,20 +187,29 @@ class HelloAsso
 
 	public function findMatchingUser(stdClass $data): ?stdClass
 	{
-		$map = (array) ($this->config->fields_map ?? []);
 		$where = '';
 		$params = [];
-		$email_field = DynamicFields::getFirstEmailField();
-		$identity_field = DynamicFields::getNameFieldsSQL();
 		$db = DB::getInstance();
-		$df = DynamicFields::getInstance();
 
 		if ($this->config->match_email_field ?? null) {
-			$where = sprintf('%s = ? COLLATE NOCASE', $db->quoteIdentifier($email_field));
+			if (empty($data->email)) {
+				return null;
+			}
+
+			$email_field = DynamicFields::getFirstEmailField();
+			$where = sprintf('%s = ?', $db->quoteIdentifier($email_field));
 			$params[] = $data->email;
 		}
 		else {
+			if (!isset($data->firstName, $data->lastName)) {
+				return null;
+			}
+
+			$map = (array) ($this->config->fields_map ?? []);
+			$df = DynamicFields::getInstance();
 			$order = $this->config->merge_names_order ?? self::MERGE_NAMES_FIRST_LAST;
+			$first_name = Utils::unicodeTransliterate($data->firstName);
+			$last_name = Utils::unicodeTransliterate($data->lastName);
 
 			// Make sure the mapped field exists in the fields list
 			if (!isset($map['firstName'], $map['lastName'])
@@ -210,27 +220,28 @@ class HelloAsso
 
 			// In case we merge first and last names in the same field
 			if ($map['firstName'] === $map['lastName']) {
-				$where = sprintf('%s = ? COLLATE U_NOCASE', $db->quoteIdentifier($map['firstName']));
+				$where = sprintf('us.%s = ? OR us.%1$s = ? OR us.%1$s = ?', $db->quoteIdentifier($map['firstName']));
 
-				if ($order === self::MERGE_NAMES_FIRST_LAST) {
-					$params[] = $data->firstName . ' ' . $data->lastName;
-				}
-				else {
-					$params[] = $data->lastName . ' ' . $data->firstName;
-				}
+				$params[] = $first_name . ' ' . $last_name;
+				$params[] = $last_name . ' ' . $first_name;
+				$params[] = $last_name;
 			}
 			else {
-				$where = sprintf('%s = ? COLLATE U_NOCASE AND %s = ? COLLATE U_NOCASE',
+				$where = sprintf('us.%s = ? AND us.%s = ? COLLATE U_NOCASE',
 					$db->quoteIdentifier($map['firstName']),
 					$db->quoteIdentifier($map['lastName'])
 				);
 
-				$params[] = $data->firstName;
-				$params[] = $data->lastName;
+				$params[] = $first_name;
+				$params[] = $last_name;
 			}
 		}
 
-		$sql = sprintf('SELECT id, %s AS identity FROM users WHERE %s;', $identity_field, $where);
+		$identity_field = DynamicFields::getNameFieldsSQL('u');
+		$sql = sprintf('SELECT u.id, %s AS identity
+			FROM users_search us
+			INNER JOIN users u ON u.id = us.id
+			WHERE %s LIMIT 1;', $identity_field, $where);
 
 		return $db->first($sql, ...$params) ?: null;
 	}

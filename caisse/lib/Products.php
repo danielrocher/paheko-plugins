@@ -53,7 +53,7 @@ class Products
 		return $db->get(POS::sql(sprintf('SELECT p.*, c.name AS category_name, p.stock * p.price AS sale_value, p.stock * p.purchase_price AS stock_value
 			FROM @PREFIX_products p %s
 			INNER JOIN @PREFIX_categories c ON c.id = p.category
-			WHERE 1 %s
+			WHERE p.archived = 0 %s
 			GROUP BY p.id ORDER BY category_name COLLATE U_NOCASE, name COLLATE U_NOCASE;', $join, $where)));
 	}
 
@@ -64,7 +64,7 @@ class Products
 	{
 		$list = self::getList($archived, $search);
 		$list->addConditions(' AND p.stock IS NOT NULL');
-		$list->addColumn('sale_value', ['select' => 'p.stock * p.price', 'label' => 'Valeur à la vente']);
+		$list->addColumn('sale_value', ['select' => 'CASE WHEN p.stock >= 0 THEN p.stock * p.price ELSE NULL END', 'label' => 'Valeur à la vente']);
 		$list->addColumn('stock_value', ['select' => 'p.stock * p.purchase_price', 'label' => 'Valeur du stock (à l\'achat)']);
 		return $list;
 	}

@@ -8,7 +8,9 @@
 			<td class="num">{if $details}{link href="order.php?id=%d"|args:$row.id_order label=$row.id}{else}{$row.id}{/if}</td>
 			<th scope="row">{$row.label}</th>
 			<td class="money">{$row.amount|money_currency|raw}</td>
+			{if $list->hasColumn('person')}
 			<td>{$row.person}</td>
+			{/if}
 			{if $list->hasColumn('custom_fields')}
 			<td>
 				{if $row.custom_fields}
@@ -32,6 +34,7 @@
 					{linkbutton shape="link" href="?id=%d&item_id=%d&item_set_user_id=%d"|args:$order.id:$row.id:$row.matching_user.id label="Lier à ce membre"}
 				{elseif $row.new_user_url}
 					{linkbutton shape="plus" href=$row.new_user_url|cat:"&set_item="|cat:$row.id|cat:"&set_item_user_id=%d" label="Créer ce membre"}
+					{button shape="search" label="Lier à un membre" onclick="openUserSelectorForItem(%d)"|args:$row.id}
 				{/if}
 			</td>
 			{/if}

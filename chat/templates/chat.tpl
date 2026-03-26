@@ -18,7 +18,7 @@
 		<ul>
 		{foreach from=$channels item="c"}
 			<?php $c->name ??= '(Notes personnelles)'; ?>
-			<li class="{if $c.id === $channel.id}current{/if} {$c.access}">{link href="./?id=%d"|args:$c.id label=$c.name}</li>
+			<li class="{if $c.id === $channel.id}current{/if} {$c.access} {if $c.has_new_messages}new{/if}">{link href="./?id=%d"|args:$c.id label=$c.name}</li>
 		{/foreach}
 		</ul>
 	</nav>
@@ -40,7 +40,7 @@
 			{/if}
 				{*TODO {linkbutton href="search.php?id=%d"|args:$channel.id shape="search" title="Rechercher dans cette discussion" target="_dialog" label=""}*}
 			{if $recipient.id_user}
-				{*TODO linkbutton href="!p/chat/leave.php?id=%d"|args:$channel.id shape="delete" label="Quitter"*}
+				{linkbutton href="!p/chat/leave.php?id=%d"|args:$channel.id shape="delete" label="Quitter"}
 				{linkbutton href="#" shape="videocam" title="Lancer une réunion vidéo" onclick="openJitsi(); return false;" label=""}
 			{/if}
 		</aside>

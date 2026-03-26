@@ -30,20 +30,35 @@ if (!empty($_GET['item_set_user_id'])) {
 	Utils::redirect('./order.php?id=' . $order->id());
 }
 
-$form->runIf('sync_all', function () use ($ha, $order) {
-	$id_creator = Session::getUserId();
-	$order->importData($ha, $id_creator, true, true, true);
-}, null, './order.php?id=' . $order->id());
+$id_creator = Session::getUserId();
+$csrf_key = 'order_' . $order->id;
 
-$form->runIf('create_transaction', function () use ($ha, $order) {
-	$id_creator = Session::getUserId();
-	$order->importData($ha, $id_creator, false, false, true);
-}, null, './order.php?id=' . $order->id());
+$form->runIf('sync_all', function () use ($order, $id_creator) {
+	$order->importAll($id_creator);
+}, $csrf_key, './order.php?id=' . $order->id());
 
-$form->runIf('create_subscriptions', function () use ($ha, $order) {
-	$id_creator = Session::getUserId();
-	$order->importData($ha, $id_creator, false, true, false);
-}, null, './order.php?id=' . $order->id());
+$form->runIf('create_transaction', function () use ($order, $id_creator) {
+	$order->importTransaction($id_creator);
+}, $csrf_key, './order.php?id=' . $order->id());
+
+$form->runIf('create_users', function () use ($order, $id_creator) {
+	$order->importMembershipUsers($id_creator);
+}, $csrf_key, './order.php?id=' . $order->id());
+
+$form->runIf('create_subscriptions', function () use ($order, $id_creator) {
+	$order->importMembershipSubscriptions($id_creator);
+}, $csrf_key, './order.php?id=' . $order->id());
+
+$form->runIf('link_id_user', function () use ($order) {
+	$item = $order->getItem(intval($_POST['id_item'] ?? 0));
+
+	if (!$item) {
+		throw new UserException('Article introuvable');
+	}
+
+	$item->set('id_user', intval($_POST['link_id_user'] ?? 0));
+	$item->save();
+}, $csrf_key, './order.php?id=' . $order->id());
 
 $payments = Payments::list($order);
 $items = Items::list($order, $ha);
@@ -62,8 +77,24 @@ else {
 
 $f = $order->form();
 $type = $f->type;
+$has_all_users = $order->hasAllUsers();
 $has_all_subscriptions = $order->hasAllSubscriptions();
+$is_synced = $order->isSynced($has_all_users, $has_all_subscriptions);
 
-$tpl->assign(compact('order', 'payments', 'items', 'payer_infos', 'found_user', 'mapped_user', 'f', 'type', 'ha', 'has_all_subscriptions'));
+$tpl->assign(compact(
+	'order',
+	'payments',
+	'items',
+	'payer_infos',
+	'found_user',
+	'mapped_user',
+	'f',
+	'type',
+	'ha',
+	'has_all_subscriptions',
+	'has_all_users',
+	'is_synced',
+	'csrf_key',
+));
 
 $tpl->display(PLUGIN_ROOT . '/templates/order.tpl');

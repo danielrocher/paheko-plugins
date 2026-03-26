@@ -6,12 +6,10 @@
 
 <h2 class="ruler">Synchronisation</h2>
 
-{if $order.status === $order::STATUS_PAID
-	&& (($f.create_payer_user !== $ha::NO_USER_ACTION && !$order.id_user)
-	|| ($f.id_year && !$order.id_transaction)
-	|| !$has_all_subscriptions)}
+{if !$is_synced}
 <form method="post" action="">
 	<p class="actions-center">
+		{csrf_field key=$csrf_key}
 		{button shape="reload" label="Tout synchroniser" name="sync_all" value=1 type="submit" class="main"}
 	</p>
 </form>
@@ -60,6 +58,7 @@
 		{else}
 			<form method="post" action="">
 			<p class="actions">
+				{csrf_field key=$csrf_key}
 				{button shape="plus" label="Créer l'écriture comptable" name="create_transaction" value=1 type="submit"}
 			</p>
 			</form>
@@ -67,19 +66,39 @@
 	</article>
 
 	{if $f.type === 'Membership'}
-	<article class="{if $has_all_subscriptions}ok{else}missing{/if}">
-		<h3>Inscriptions aux activités</h3>
-		{if $has_all_subscriptions}
-			<p class="status">Toutes les inscriptions ont été effectuées.</p>
-		{else}
-			<p class="status">Il manque des inscriptions.</p>
-			<form method="post" action="">
-			<p class="actions">
-				{button shape="link" label="Créer les inscriptions manquantes" name="create_subscriptions" value=1 type="submit"}
-			</p>
-			</form>
-		{/if}
-	</article>
+		<article class="{if $has_all_users}ok{else}missing{/if}">
+			<h3>Adhésions</h3>
+			{if $has_all_users === null}
+				<p class="status">Aucun tarif de la commande n'est configuré pour synchroniser les adhésions.</p>
+			{elseif $has_all_users}
+				<p class="alert">Toutes les adhésions sont liées à des membres.</p>
+			{else}
+				<p class="alert block">Certaines adhésions ne sont pas liées à des membres.</p>
+				<form method="post" action="">
+				<p class="actions">
+					{csrf_field key=$csrf_key}
+					{button shape="link" label="Créer ou lier les membres" name="create_users" value=1 type="submit"}
+				</p>
+				</form>
+			{/if}
+		</article>
+
+		<article class="{if $has_all_subscriptions && $has_all_users}ok{else}missing{/if}">
+			<h3>Inscriptions aux activités</h3>
+			{if $has_all_subscriptions === null}
+				<p class="status">Aucun tarif de la commande n'est configuré pour les inscriptions.</p>
+			{elseif $has_all_subscriptions}
+				<p class="status">Toutes les inscriptions ont été effectuées.</p>
+			{else}
+				<p class="status">Il manque des inscriptions.</p>
+				<form method="post" action="">
+				<p class="actions">
+					{csrf_field key=$csrf_key}
+					{button shape="link" label="Créer les inscriptions manquantes" name="create_subscriptions" value=1 type="submit"}
+				</p>
+				</form>
+			{/if}
+		</article>
 	{/if}
 </section>
 
@@ -122,5 +141,29 @@
 	</dd>
 	{/foreach}
 </dl>
+
+<form method="post" action="" class="hidden" id="link_form">
+	{csrf_field key=$csrf_key}
+	<input type="hidden" name="id_item" />
+	<input type="hidden" name="link_id_user" />
+</form>
+
+<script type="text/javascript">
+var selector_url = {"!users/selector.php?_dialog"|local_url|escape:'json'};
+{literal}
+var f = $('#link_form');
+window.openUserSelectorForItem = function(id) {
+	f.id_item.value = id;
+	g.openFrameDialog(selector_url);
+}
+
+window.g.inputListSelected = function(id_user, label) {
+	g.closeDialog();
+	f.link_id_user.value = id_user;
+	f.submit();
+}
+{/literal}
+</script>
+
 
 {include file="_foot.tpl"}
